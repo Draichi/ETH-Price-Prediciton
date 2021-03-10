@@ -1,52 +1,48 @@
 import requests
-import datetime
-
-TOKEN_NAME_TO_ID = {
-    'SNX': '2586',
-    'BTC': '1',
-    'ETH': '1027',
-    'YFI': '5864',
-    'CRV': '6538',
-    'AAVE': '7278',
-    'UNI': '7083',
-    'sXAU': '6191',
-    'sXAG': '5863',
-    'sDEFI': '5862',
-    'iBTC': '6200',
-    'iETH': '6188',
-}
+import ta
+import pandas as pd
 
 
-def get_datasets(asset_name: str, days: int = 90) -> object:
-    """Get datasets from Coinmarketcap API
+def get_datasets(asset_name: str, currency: str = 'USD', days: int = 2, interval: str = 'daily') -> pd.DataFrame:
+    """Get prices, market_caps and total_volumes for a given asset
 
     Args:
-        asset_name (str): Ex.: 'BTC'
+        asset_name (str): Ex.: bitcoin
+        currency (str, optional): Defaults to 'USD'.
+        days (int, optional): Defaults to 2.
+        interval (str, optional): Defaults to 'daily'.
 
     Returns:
-        object: Pandas Dataframe including Price, MarketCap, Volume
+        Pandas DataFrame: Containing ds(timestamp), prices, total_volumes, market_caps
     """
-    asset_id = TOKEN_NAME_TO_ID[asset_name]
-    url = get_endpoint(asset_id=asset_id, days=days)
+    url = get_endpoint(asset_name=asset_name,
+                       currency=currency, days=days, interval=interval)
     print('> Fetching {}'.format(asset_name))
-    res = requests.get(url).json()
-    data: list = res['data']
-    print(data)
-    quit()
+    res: list('prices', 'total_volumes',
+              'market_caps') = requests.get(url).json()
     temp_dataset = {
         'ds': [],
-        'y': []
+        'prices': [],
+        'total_volumes': [],
+        'market_caps': []
     }
-    for (timestamp, price_obj) in data.items():
-        timestamp = timestamp.split('T')[0]
-        price = price_obj['USD'][0]
-        volume = price_obj['USD'][1]
-        market_cap = price_obj['USD'][2]
-        temp_dataset['ds'].append(timestamp)
-        temp_dataset['y'].append(price_obj['USD'][0])
+    timestamp_processed = False
+    for indicator in res:
+        indicator_list = res[indicator]
+        for item in indicator_list:
+            if not timestamp_processed:
+                timestamp = item[0]
+                temp_dataset['ds'].append(timestamp)
+            indicator_item = item[1]
+            temp_dataset[indicator].append(indicator_item)
+        timestamp_processed = True
+    df = pd.DataFrame(temp_dataset)
+    df.set_index('ds', inplace=True)
+
+    return df
 
 
-def gen_indicators(df: object) -> object:
+def gen_features(df: pd.DataFrame) -> pd.DataFrame:
     """Generate technical indicators
 
     Args:
@@ -55,7 +51,7 @@ def gen_indicators(df: object) -> object:
     Returns:
         Pandas Dataframe: Dataframe including Indicators Columns
     """
-    pass
+    return df
 
 
 def gen_label(df: object, days: int = 7) -> object:
@@ -70,34 +66,17 @@ def gen_label(df: object, days: int = 7) -> object:
     pass
 
 
-def get_actual_epoch() -> int:
-    """Get actual epoch timestamp
-
-    Returns:
-        int: Actual timestamp
-    """
-    return int(datetime.datetime.now().timestamp())
-
-
-def get_endpoint(asset_id: int, days: int = 90) -> str:
-    """Get dataset download endpoint
-
-    Args:
-        asset_id (int): Ex.: 1 (for BTC)
-
-    Returns:
-        str: URL
-    """
-    end_date = datetime.datetime.now()
-    start_date = end_date - datetime.timedelta(days=days)
-    time_end = str(int(end_date.timestamp()))
-    time_start = str(int(start_date.timestamp()))
-    # feb_11_timestamp = str(1518389909)
-
-    url = 'https://web-api.coinmarketcap.com/v1.1/cryptocurrency/quotes/historical?convert=USD&format=chart_crypto_details&id=' + \
-        str(asset_id)+'&interval=1d&time_end=' + \
-        time_end+'&time_start='+time_start
+def get_endpoint(asset_name: str, currency: str, days: int, interval: str) -> str:
+    url = 'https://api.coingecko.com/api/v3/coins/' + asset_name + \
+          '/market_chart?vs_currency=' + currency + \
+          '&days=' + str(days) + \
+          '&interval=' + interval
     return url
 
 
-get_datasets('sDEFI', 15)
+sdefi_df = get_datasets(asset_name='sdefi')
+
+print(sdefi_df)
+
+sdefi_features = gen_features(df=sdefi_df)
+print(sdefi_features)
