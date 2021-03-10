@@ -1,5 +1,5 @@
 import requests
-import ta
+from ta.momentum import KAMAIndicator
 import pandas as pd
 
 
@@ -21,7 +21,7 @@ def get_datasets(asset_name: str, currency: str = 'USD', days: int = 2, interval
     res: list('prices', 'total_volumes',
               'market_caps') = requests.get(url).json()
     temp_dataset = {
-        'ds': [],
+        'date': [],
         'prices': [],
         'total_volumes': [],
         'market_caps': []
@@ -32,12 +32,13 @@ def get_datasets(asset_name: str, currency: str = 'USD', days: int = 2, interval
         for item in indicator_list:
             if not timestamp_processed:
                 timestamp = item[0]
-                temp_dataset['ds'].append(timestamp)
+                temp_dataset['date'].append(timestamp)
             indicator_item = item[1]
             temp_dataset[indicator].append(indicator_item)
         timestamp_processed = True
     df = pd.DataFrame(temp_dataset)
-    df.set_index('ds', inplace=True)
+    df['date'] = pd.to_datetime(df['date'], unit='ms')
+    df.set_index('date', inplace=True)
 
     return df
 
@@ -51,6 +52,8 @@ def gen_features(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         Pandas Dataframe: Dataframe including Indicators Columns
     """
+    kama_indicator = KAMAIndicator(df['prices'], window=2)
+    df['kama'] = kama_indicator.kama()
     return df
 
 
@@ -74,9 +77,7 @@ def get_endpoint(asset_name: str, currency: str, days: int, interval: str) -> st
     return url
 
 
-sdefi_df = get_datasets(asset_name='sdefi')
-
-print(sdefi_df)
+sdefi_df = get_datasets(asset_name='sdefi', days=30)
 
 sdefi_features = gen_features(df=sdefi_df)
 print(sdefi_features)
