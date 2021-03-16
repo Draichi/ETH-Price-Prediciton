@@ -1,3 +1,5 @@
+#! ./venv/bin/activate
+
 import pandas as pd
 import xgboost as xgb
 import numpy as np
@@ -6,8 +8,17 @@ from sklearn.metrics import mean_squared_error
 from sklearn.datasets import load_boston
 from sklearn.model_selection import train_test_split
 
-# ! Load eth, btc, sdefi data
+from app.helpers import gen_df
 
+df = gen_df(asset_name='ethereum', days=30)
+
+for asset_name in ['bitcoin', 'sdefi']:
+    temp_df = gen_df(asset_name=asset_name, days=30)
+    df = pd.merge(df, temp_df, on="date")
+
+print(df)
+print(df.info(verbose=True))
+quit()
 
 boston = load_boston()
 
